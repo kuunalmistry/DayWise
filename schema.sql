@@ -8,7 +8,8 @@ CREATE TABLE users (
     email VARCHAR(254) NOT NULL UNIQUE,
     password_hash VARCHAR(256) NOT NULL,
     bio VARCHAR(300) NOT NULL DEFAULT '',
-    avatar_filename VARCHAR(255)
+    avatar_filename VARCHAR(255),
+    theme VARCHAR(20) NOT NULL DEFAULT 'blue'
 );
 
 CREATE TABLE assignments (

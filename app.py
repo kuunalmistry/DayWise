@@ -51,6 +51,15 @@ SUBJECT_OPTIONS = [
     "Cloud Application Development",
 ]
 
+THEME_OPTIONS = {
+    "blue": "Blue",
+    "purple": "Purple",
+    "red": "Red",
+    "yellow": "Yellow",
+    "green": "Green",
+    "black": "Black",
+}
+
 # ------------------------------------------------------------
 # Models
 # ------------------------------------------------------------
@@ -106,6 +115,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     bio = db.Column(db.String(300), nullable=False, default="")
     avatar_filename = db.Column(db.String(255))
+    theme = db.Column(db.String(20), nullable=False, default="blue")
 
 
 # ------------------------------------------------------------
@@ -204,6 +214,8 @@ def inject_helpers():
         "today": date.today(),
         "subject_options": SUBJECT_OPTIONS,
         "current_user": user,
+        "current_theme": user.theme if user and user.theme in THEME_OPTIONS else "blue",
+        "theme_options": THEME_OPTIONS,
         "user_initials": "".join(
             part[0] for part in user.name.split()[:2]
         ).upper() if user else "",
@@ -594,9 +606,18 @@ def add_subtask(assignment_id):
 @app.route("/toggle-subtask/<int:subtask_id>", methods=["POST"])
 def toggle_subtask(subtask_id):
     subtask = SubTask.query.get_or_404(subtask_id)
-    owned_assignment_or_404(subtask.assignment_id)
+    assignment = owned_assignment_or_404(subtask.assignment_id)
     subtask.completed = not subtask.completed
     db.session.commit()
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify({
+            "assignment_id": assignment.id,
+            "subtask_id": subtask.id,
+            "completed": subtask.completed,
+            "completed_subtasks": sum(item.completed for item in assignment.subtasks),
+            "total_subtasks": len(assignment.subtasks),
+            "progress": assignment_progress(assignment),
+        })
     return redirect(request.referrer or url_for("edit_assignment", assignment_id=subtask.assignment_id))
 
 
@@ -809,9 +830,20 @@ def delete_file(file_id):
 # ------------------------------------------------------------
 # Settings
 # ------------------------------------------------------------
-@app.route("/settings")
+@app.route("/settings", methods=["GET", "POST"])
 def settings():
-    return render_template("settings.html")
+    if request.method == "POST":
+        theme = request.form.get("theme", "")
+        if theme not in THEME_OPTIONS:
+            flash("Choose one of the available workspace themes.", "error")
+            return redirect(url_for("settings"))
+
+        g.current_user.theme = theme
+        db.session.commit()
+        flash(f"{THEME_OPTIONS[theme]} glass theme applied.", "success")
+        return redirect(url_for("settings"))
+
+    return render_template("settings.html", theme_options=THEME_OPTIONS)
 
 
 @app.errorhandler(413)
@@ -825,6 +857,14 @@ def file_too_large(_error):
 
 def initialize_database():
     db.create_all()
+    user_columns = {
+        column["name"] for column in inspect(db.engine).get_columns("users")
+    }
+    if "theme" not in user_columns:
+        db.session.execute(text(
+            "ALTER TABLE users ADD COLUMN theme VARCHAR(20) NOT NULL DEFAULT 'blue'"
+        ))
+
     assignment_columns = {
         column["name"] for column in inspect(db.engine).get_columns("assignments")
     }

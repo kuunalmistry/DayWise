@@ -2,14 +2,75 @@
 <div class="app-shell">{% include '_sidebar.html' %}<main class="main-content"><header class="topbar"><div class="term-label"><strong>Fall term</strong><span>• Week 6</span></div><form class="top-search" action="{{ url_for('assignments') }}"><span class="material-symbols-outlined">search</span><input name="q" value="{{ search }}" placeholder="Search assignments, notes, or subjects"><input type="hidden" name="status" value="{{ status_filter }}"><input type="hidden" name="subject" value="{{ subject_filter }}"></form><div class="top-actions"><button class="primary-button" onclick="openModal('assignmentModal');return false"><span class="material-symbols-outlined">add</span>New task</button><span class="avatar-photo">KM</span></div></header>
 <div class="page-shell calendar-page"><section class="page-title"><div><span class="eyebrow">PLAN AHEAD</span><h1>{{ today.strftime('%B %Y') }}</h1><p>Deadlines highlighted by priority.</p></div><div class="month-controls"><button class="icon-button" id="prevMonth"><span class="material-symbols-outlined">chevron_left</span></button><button class="icon-button" id="nextMonth"><span class="material-symbols-outlined">chevron_right</span></button></div></section>
 <div class="calendar-panel glass-card"><div class="calendar-week"><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span></div><div class="calendar-grid" id="calendarGrid"></div></div>
-<section class="calendar-lower"><article class="glass-card queue-card wide-queue"><div class="card-heading"><div><span class="eyebrow">ASSIGNMENTS</span><h2>Assignment queue</h2></div><div class="filter-row"><a class="filter-chip {% if status_filter=='all' %}active{% endif %}" href="{{ url_for('assignments') }}">All {{ total }}</a><a class="filter-chip {% if status_filter=='pending' %}active{% endif %}" href="{{ url_for('assignments',status='pending') }}">In progress {{ pending }}</a><a class="filter-chip {% if status_filter=='completed' %}active{% endif %}" href="{{ url_for('assignments',status='completed') }}">Completed {{ completed }}</a></div></div>{% for assignment in assignments %}<div class="full-task-row"><div class="task-color {{ assignment.priority|lower }}"></div><div class="task-main"><strong>{{ assignment.title }}</strong><small>{{ assignment.subject }} · {{ assignment.due_date.strftime('%b %d, %Y') }}</small>{% if assignment.subtasks %}<div class="task-progress"><span style="width:{{ assignment_progress(assignment) }}%"></span></div>{% endif %}</div><span class="status-badge {{ assignment.priority|lower }}">{{ assignment.status }}</span><div class="row-actions"><a class="icon-button" href="{{ url_for('edit_assignment',assignment_id=assignment.id) }}"><span class="material-symbols-outlined">edit</span></a>{% if assignment.status!='Completed' %}<form action="{{ url_for('complete_assignment',assignment_id=assignment.id) }}" method="POST"><button class="icon-button success" title="Complete"><span class="material-symbols-outlined">check</span></button></form>{% endif %}<form action="{{ url_for('delete_assignment',assignment_id=assignment.id) }}" method="POST" onsubmit="return confirm('Delete this assignment?')"><button class="icon-button danger"><span class="material-symbols-outlined">delete</span></button></form></div></div>{% else %}<div class="empty-state">No assignments found.</div>{% endfor %}</article></section></div></main></div>
-<div id="calendarAssignments" hidden>{% for assignment in assignments %}<span data-date="{{ assignment.due_date.isoformat() }}" data-title="{{ assignment.title }}" data-subject="{{ assignment.subject }}" data-priority="{{ assignment.priority|lower }}" data-status="{{ assignment.status }}"></span>{% endfor %}</div>
+<section class="calendar-lower"><article class="glass-card queue-card wide-queue"><div class="card-heading"><div><span class="eyebrow">ASSIGNMENTS</span><h2>Assignment queue</h2></div><div class="filter-row"><a class="filter-chip {% if status_filter=='all' %}active{% endif %}" href="{{ url_for('assignments') }}">All {{ total }}</a><a class="filter-chip {% if status_filter=='pending' %}active{% endif %}" href="{{ url_for('assignments',status='pending') }}">In progress {{ pending }}</a><a class="filter-chip {% if status_filter=='completed' %}active{% endif %}" href="{{ url_for('assignments',status='completed') }}">Completed {{ completed }}</a></div></div>{% for assignment in assignments %}<div class="full-task-row"><div class="task-color {% if assignment.status == 'Completed' %}completed{% else %}{{ assignment.priority|lower }}{% endif %}"></div><div class="task-main"><strong>{{ assignment.title }}</strong><small>{{ assignment.subject }} · {{ assignment.due_date.strftime('%b %d, %Y') }}</small>{% if assignment.subtasks %}<div class="task-progress{% if assignment.status == 'Completed' %} completed{% endif %}"><span style="width:{{ 100 if assignment.status == 'Completed' else assignment_progress(assignment) }}%"></span></div>{% endif %}</div><span class="status-badge {% if assignment.status == 'Completed' %}completed{% else %}{{ assignment.priority|lower }}{% endif %}">{{ assignment.status }}</span><div class="row-actions"><a class="icon-button" href="{{ url_for('edit_assignment',assignment_id=assignment.id) }}"><span class="material-symbols-outlined">edit</span></a>{% if assignment.status!='Completed' %}<form action="{{ url_for('complete_assignment',assignment_id=assignment.id) }}" method="POST"><button class="icon-button success" title="Complete"><span class="material-symbols-outlined">check</span></button></form>{% endif %}<form action="{{ url_for('delete_assignment',assignment_id=assignment.id) }}" method="POST" onsubmit="return confirm('Delete this assignment?')"><button class="icon-button danger"><span class="material-symbols-outlined">delete</span></button></form></div></div>{% else %}<div class="empty-state">No assignments found.</div>{% endfor %}</article></section></div></main></div>
+<div id="calendarAssignments" hidden>{% for assignment in assignments %}<span data-assignment-id="{{ assignment.id }}" data-date="{{ assignment.due_date.isoformat() }}" data-title="{{ assignment.title }}" data-subject="{{ assignment.subject }}" data-priority="{{ assignment.priority|lower }}" data-status="{{ assignment.status }}">{% for subtask in assignment.subtasks %}<i data-subtask-id="{{ subtask.id }}" data-title="{{ subtask.title }}" data-completed="{{ 'true' if subtask.completed else 'false' }}" data-url="{{ url_for('toggle_subtask', subtask_id=subtask.id) }}"></i>{% endfor %}</span>{% endfor %}</div>
 <div class="modal-backdrop" id="assignmentModal"><div class="modal-card"><div class="modal-header"><div><span class="eyebrow">NEW TASK</span><h2>Create assignment</h2></div><button class="icon-button" type="button" onclick="closeModal('assignmentModal')"><span class="material-symbols-outlined">close</span></button></div><form action="{{ url_for('add_assignment') }}" method="POST"><div class="form-grid"><label>Title<input name="title" required placeholder="Assignment title"></label><label>Subject<select name="subject" required><option value="" disabled selected>Select a subject</option>{% for subject in subject_options %}<option value="{{ subject }}">{{ subject }}</option>{% endfor %}</select></label><label class="full">Description<textarea name="description" rows="3" placeholder="What needs to be completed?"></textarea></label><label>Due date<input type="date" name="due_date" required></label><label>Priority<select name="priority"><option>High</option><option selected>Medium</option><option>Low</option></select></label><div class="full"><div class="form-label">Subtasks</div><div id="calendarSubtasks" class="subtask-inputs"></div><button type="button" class="ghost-button" onclick="addSubtaskInput('calendarSubtasks')"><span class="material-symbols-outlined">add</span>Add subtask</button></div></div><div class="modal-actions"><button type="button" class="ghost-button" onclick="closeModal('assignmentModal')">Cancel</button><button class="primary-button">Create task</button></div></form></div></div>
 <script>
-(function(){const grid=document.getElementById('calendarGrid'),data=[...document.querySelectorAll('#calendarAssignments span')].map(x=>x.dataset);let view=new Date({{ today.year }},{{ today.month-1 }},1);const weekdays=['MON','TUE','WED','THU','FRI','SAT','SUN'];function render(){const y=view.getFullYear(),m=view.getMonth();const monthName=view.toLocaleString('en-US',{month:'long',year:'numeric'});document.querySelector('.page-title h1').textContent=monthName;const first=(new Date(y,m,1).getDay()+6)%7;const days=new Date(y,m+1,0).getDate();let html='';for(let i=0;i<first;i++)html+='<div class="day-cell empty"></div>';for(let d=1;d<=days;d++){const key=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;const tasks=data.filter(x=>x.date===key);const todayKey=`{{ today.isoformat() }}`;html+=`<div class="day-cell ${key===todayKey?'current-day':''}"><span class="day-number">${d}</span>${tasks.slice(0,3).map(t=>`<a class="calendar-task ${t.priority}" href="{{ url_for('assignments') }}?q=${encodeURIComponent(t.title)}"><i></i>${t.title}</a>`).join('')}</div>`}grid.innerHTML=html}document.getElementById('prevMonth').onclick=()=>{view.setMonth(view.getMonth()-1);render()};document.getElementById('nextMonth').onclick=()=>{view.setMonth(view.getMonth()+1);render()};render()})();
+(function(){const grid=document.getElementById('calendarGrid'),data=[...document.querySelectorAll('#calendarAssignments span')].map(x=>x.dataset);let view=new Date({{ today.year }},{{ today.month-1 }},1);const weekdays=['MON','TUE','WED','THU','FRI','SAT','SUN'];function render(){const y=view.getFullYear(),m=view.getMonth();const monthName=view.toLocaleString('en-US',{month:'long',year:'numeric'});document.querySelector('.page-title h1').textContent=monthName;const first=(new Date(y,m,1).getDay()+6)%7;const days=new Date(y,m+1,0).getDate();let html='';for(let i=0;i<first;i++)html+='<div class="day-cell empty"></div>';for(let d=1;d<=days;d++){const key=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;const tasks=data.filter(x=>x.date===key);const todayKey=`{{ today.isoformat() }}`;html+=`<div class="day-cell ${key===todayKey?'current-day':''}"><span class="day-number">${d}</span>${tasks.slice(0,3).map(t=>`<a class="calendar-task ${t.status==='Completed'?'completed':t.priority}" href="{{ url_for('assignments') }}?q=${encodeURIComponent(t.title)}"><i></i>${t.title}</a>`).join('')}</div>`}grid.innerHTML=html}document.getElementById('prevMonth').onclick=()=>{view.setMonth(view.getMonth()-1);render()};document.getElementById('nextMonth').onclick=()=>{view.setMonth(view.getMonth()+1);render()};render()})();
 </script><script>
 function openModal(id){document.getElementById(id)?.classList.add('open')}
 function closeModal(id){document.getElementById(id)?.classList.remove('open')}
 function addSubtaskInput(id){const wrap=document.getElementById(id);const row=document.createElement('div');row.className='subtask-input-row';row.innerHTML='<input name="subtasks" maxlength="255" placeholder="Subtask"><button type="button" class="icon-button" onclick="this.parentElement.remove()"><span class="material-symbols-outlined">close</span></button>';wrap.appendChild(row)}
 document.querySelectorAll('.modal-backdrop').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open')}));
+if(new URLSearchParams(window.location.search).has('new'))openModal('assignmentModal');
+</script>
+<script>
+(() => {
+  const container = document.querySelector('.calendar-lower');
+  if (!container) return;
+
+  let activeRequest;
+
+  async function loadQueue(url, updateHistory) {
+    activeRequest?.abort();
+    const controller = new AbortController();
+    activeRequest = controller;
+    container.setAttribute('aria-busy', 'true');
+
+    try {
+      const response = await fetch(url, {
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+        signal: controller.signal
+      });
+      if (!response.ok) throw new Error(`Assignment filter request failed (${response.status}).`);
+
+      const html = await response.text();
+      const nextDocument = new DOMParser().parseFromString(html, 'text/html');
+      const nextQueue = nextDocument.querySelector('.wide-queue');
+      const currentQueue = container.querySelector('.wide-queue');
+      if (!nextQueue || !currentQueue) throw new Error('The filtered assignment queue was not returned.');
+
+      currentQueue.replaceWith(nextQueue);
+      const nextMetadata = nextDocument.querySelector('#calendarAssignments');
+      const currentMetadata = document.querySelector('#calendarAssignments');
+      if (nextMetadata && currentMetadata) {
+        currentMetadata.replaceChildren(...[...nextMetadata.children].map(item => item.cloneNode(true)));
+        window.dispatchEvent(new Event('assignment-queue-updated'));
+      }
+      if (updateHistory) window.history.pushState({}, '', url);
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+      console.error(error);
+      window.location.assign(url);
+    } finally {
+      if (activeRequest === controller) {
+        activeRequest = undefined;
+        container.removeAttribute('aria-busy');
+      }
+    }
+  }
+
+  container.addEventListener('click', event => {
+    const filter = event.target.closest('.filter-chip');
+    if (!filter) return;
+    event.preventDefault();
+    const requestedStatus = new URL(filter.href, window.location.href).searchParams.get('status');
+    const nextUrl = new URL(window.location.href);
+    if (requestedStatus) nextUrl.searchParams.set('status', requestedStatus);
+    else nextUrl.searchParams.delete('status');
+    if (nextUrl.href !== window.location.href) loadQueue(nextUrl.href, true);
+  });
+
+  window.addEventListener('popstate', () => loadQueue(window.location.href, false));
+})();
 </script></body></html>

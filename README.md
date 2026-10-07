@@ -64,8 +64,13 @@ The original cloud deployment architecture can remain documented separately for 
 - Account sign-up, sign-in, and sign-out
 - Private per-account assignments and study files
 - Editable profile details and local profile photos
+- Six account-saved glass color themes
+- Mobile-specific layouts and touch-friendly controls
 - Responsive web interface
 - SQLite database with SQLAlchemy ORM
+
+Choose Blue, Purple, Red, Yellow, Green, or Black from **Settings → Glass color theme**.
+Theme preference is stored on the signed-in account; Blue remains the default.
 
 ## Requirements
 
