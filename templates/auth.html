@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ 'Create account' if mode == 'signup' else 'Sign in' }} · StudySync</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400..700,0..1,-50..200" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="auth-body">
+  <main class="auth-layout">
+    <a class="brand auth-brand" href="{{ url_for('login') }}">
+      <span class="brand-mark">S</span><span class="brand-name">StudySync</span>
+    </a>
+    <section class="auth-card glass-card">
+      <div class="auth-heading">
+        <span class="eyebrow">{{ 'YOUR STUDY SPACE' if mode == 'signup' else 'WELCOME BACK' }}</span>
+        <h1>{{ 'Make room to focus.' if mode == 'signup' else 'Good to see you.' }}</h1>
+        <p>{{ 'Create an account to organize your semester.' if mode == 'signup' else 'Sign in to pick up where you left off.' }}</p>
+      </div>
+      {% with messages=get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="auth-messages" role="status">
+            {% for category, message in messages %}
+              <p class="auth-message {{ category }}">{{ message }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      <form class="auth-form" method="POST" action="{{ url_for('signup' if mode == 'signup' else 'login') }}">
+        {% if mode == 'signup' %}
+          <label>Your name<input name="name" maxlength="80" autocomplete="name" required placeholder="e.g. Kuunal Mistry" value="{{ request.form.get('name', '') }}"></label>
+        {% endif %}
+        <label>Email address<input type="email" name="email" maxlength="254" autocomplete="email" required placeholder="you@example.com" value="{{ request.form.get('email', '') }}"></label>
+        <label>Password<input type="password" name="password" minlength="{{ 8 if mode == 'signup' else 1 }}" maxlength="128" autocomplete="{{ 'new-password' if mode == 'signup' else 'current-password' }}" required placeholder="{{ 'At least 8 characters' if mode == 'signup' else 'Enter your password' }}"></label>
+        <button class="primary-button auth-submit" type="submit">{{ 'Create your account' if mode == 'signup' else 'Sign in' }}<span class="material-symbols-outlined">arrow_forward</span></button>
+      </form>
+      <p class="auth-switch">
+        {{ 'Already have an account?' if mode == 'signup' else 'New to StudySync?' }}
+        <a href="{{ url_for('login' if mode == 'signup' else 'signup') }}">{{ 'Sign in' if mode == 'signup' else 'Create an account' }}</a>
+      </p>
+      <div class="auth-footnote"><span class="material-symbols-outlined">lock</span>Your study workspace stays yours.</div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<aside class="sidebar">
+  <a class="brand" href="{{ url_for('home') }}">
+    <span class="brand-mark">S</span><span class="brand-name">StudySync</span>
+  </a>
+  <nav class="side-nav">
+    <a href="{{ url_for('home') }}" class="side-link {% if request.endpoint == 'home' %}active{% endif %}" title="Overview"><span class="material-symbols-outlined">grid_view</span><span>Overview</span></a>
+    <a href="{{ url_for('subjects') }}" class="side-link {% if request.endpoint in ['subjects','subject_detail'] %}active{% endif %}" title="Subjects"><span class="material-symbols-outlined">menu_book</span><span>Subjects</span></a>
+    <a href="{{ url_for('assignments') }}" class="side-link {% if request.endpoint in ['assignments','edit_assignment'] %}active{% endif %}" title="Calendar"><span class="material-symbols-outlined">calendar_month</span><span>Calendar</span></a>
+    <a href="{{ url_for('files') }}" class="side-link {% if request.endpoint in ['files','download_file','delete_file'] %}active{% endif %}" title="Notes & files"><span class="material-symbols-outlined">description</span><span>Notes &amp; files</span></a>
+    <a href="{{ url_for('profile') }}" class="side-link {% if request.endpoint in ['profile','profile_avatar'] %}active{% endif %}" title="Profile"><span class="material-symbols-outlined">account_circle</span><span>Profile</span></a>
+  </nav>
+  <a href="{{ url_for('settings') }}" class="side-link settings-link {% if request.endpoint == 'settings' %}active{% endif %}" title="Settings"><span class="material-symbols-outlined">settings</span><span>Settings</span></a>
+  <form class="sidebar-logout" action="{{ url_for('logout') }}" method="POST"><button class="side-link" type="submit" title="Sign out"><span class="material-symbols-outlined">logout</span><span>Sign out</span></button></form>
+</aside>
+<div class="mobile-nav" aria-label="Quick navigation">
+  <a href="{{ url_for('home') }}" class="{% if request.endpoint == 'home' %}active{% endif %}"><span class="material-symbols-outlined">grid_view</span></a>
+  <a href="{{ url_for('subjects') }}" class="{% if request.endpoint in ['subjects','subject_detail'] %}active{% endif %}"><span class="material-symbols-outlined">menu_book</span></a>
+  <a href="{{ url_for('assignments') }}" class="{% if request.endpoint in ['assignments','edit_assignment'] %}active{% endif %}"><span class="material-symbols-outlined">calendar_month</span></a>
+  <a href="{{ url_for('files') }}" class="{% if request.endpoint in ['files','download_file','delete_file'] %}active{% endif %}"><span class="material-symbols-outlined">description</span></a>
+  <a href="{{ url_for('profile') }}" class="{% if request.endpoint in ['profile','profile_avatar'] %}active{% endif %}"><span class="material-symbols-outlined">account_circle</span></a>
+  <button type="button" onclick="document.getElementById('assignmentModal')?.classList.add('open')"><span class="material-symbols-outlined">add</span></button>
+</div>
+{% with messages=get_flashed_messages(with_categories=true) %}{% if messages %}<div class="toast-stack">{% for category,message in messages %}<div class="toast {{ category }}"><span class="material-symbols-outlined">{{ 'check_circle' if category=='success' else 'error' }}</span>{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.avatar-photo').forEach(avatar => {
+    avatar.textContent = {{ user_initials|tojson }};
+    {% if current_user.avatar_filename %}
+    const image = document.createElement('img');
+    image.src = {{ url_for('profile_avatar')|tojson }};
+    image.alt = {{ current_user.name|tojson }} + ' profile photo';
+    avatar.replaceChildren(image);
+    {% endif %}
+  });
+  const greeting = document.querySelector('.hero h1');
+  if (greeting) greeting.textContent = 'Good morning, ' + {{ current_user.name.split()[0]|tojson }};
+});
+</script>
