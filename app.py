@@ -172,6 +172,11 @@ def assignment_progress(assignment):
     return round(completed / len(assignment.subtasks) * 100)
 
 
+def mark_assignment_subtasks_completed(assignment):
+    for subtask in assignment.subtasks:
+        subtask.completed = True
+
+
 def due_label(assignment):
     delta = (assignment.due_date - date.today()).days
     if assignment.status == "Completed":
@@ -608,7 +613,11 @@ def add_subtask(assignment_id):
     assignment = owned_assignment_or_404(assignment_id)
     title = request.form.get("title", "").strip()
     if title:
-        db.session.add(SubTask(assignment_id=assignment.id, title=title))
+        db.session.add(SubTask(
+            assignment_id=assignment.id,
+            title=title,
+            completed=assignment.status == "Completed",
+        ))
         db.session.commit()
         flash("Subtask added.", "success")
     return redirect(url_for("edit_assignment", assignment_id=assignment.id))
@@ -618,7 +627,9 @@ def add_subtask(assignment_id):
 def toggle_subtask(subtask_id):
     subtask = SubTask.query.get_or_404(subtask_id)
     assignment = owned_assignment_or_404(subtask.assignment_id)
-    subtask.completed = not subtask.completed
+    subtask.completed = (
+        True if assignment.status == "Completed" else not subtask.completed
+    )
     db.session.commit()
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return jsonify({
@@ -646,6 +657,7 @@ def delete_subtask(subtask_id):
 def complete_assignment(assignment_id):
     assignment = owned_assignment_or_404(assignment_id)
     assignment.status = "Completed"
+    mark_assignment_subtasks_completed(assignment)
     if assignment.completed_at is None:
         assignment.completed_at = datetime.utcnow()
     db.session.commit()
@@ -681,6 +693,8 @@ def edit_assignment(assignment_id):
         if new_status != assignment.status:
             assignment.completed_at = datetime.utcnow() if new_status == "Completed" else None
         assignment.status = new_status
+        if new_status == "Completed":
+            mark_assignment_subtasks_completed(assignment)
         db.session.commit()
         flash("Assignment updated successfully.", "success")
         return redirect(url_for("assignments"))
@@ -916,6 +930,11 @@ def initialize_database():
     ))
     db.session.execute(text(
         "CREATE INDEX IF NOT EXISTS ix_uploaded_files_user_id ON uploaded_files (user_id)"
+    ))
+    db.session.execute(text(
+        "UPDATE subtasks SET completed = 1 "
+        "WHERE completed = 0 AND assignment_id IN "
+        "(SELECT id FROM assignments WHERE status = 'Completed')"
     ))
     db.session.commit()
 

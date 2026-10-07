@@ -16,15 +16,21 @@
   <a href="{{ url_for('home') }}" aria-label="Overview" title="Overview" class="{% if request.endpoint == 'home' %}active{% endif %}"><span class="material-symbols-outlined">grid_view</span></a>
   <a href="{{ url_for('subjects') }}" aria-label="Subjects" title="Subjects" class="{% if request.endpoint in ['subjects','subject_detail'] %}active{% endif %}"><span class="material-symbols-outlined">menu_book</span></a>
   <a href="{{ url_for('assignments') }}" aria-label="Calendar" title="Calendar" class="{% if request.endpoint in ['assignments','edit_assignment'] %}active{% endif %}"><span class="material-symbols-outlined">calendar_month</span></a>
-  <a href="{{ url_for('files') }}" aria-label="Notes and files" title="Notes and files" class="{% if request.endpoint in ['files','download_file','delete_file'] %}active{% endif %}"><span class="material-symbols-outlined">description</span></a>
-  <a href="{{ url_for('profile') }}" aria-label="Profile" title="Profile" class="{% if request.endpoint in ['profile','profile_avatar'] %}active{% endif %}"><span class="material-symbols-outlined">account_circle</span></a>
-  <a href="{{ url_for('settings') }}" aria-label="Settings" title="Settings" class="{% if request.endpoint == 'settings' %}active{% endif %}"><span class="material-symbols-outlined">settings</span></a>
+  <div class="mobile-overflow">
+    <button class="mobile-overflow-toggle" id="mobileOverflowToggle" type="button" aria-label="More pages" aria-expanded="false" aria-controls="mobileOverflowMenu" title="More pages"><span class="material-symbols-outlined">more_horiz</span></button>
+    <div class="mobile-more-menu" id="mobileOverflowMenu" aria-label="More pages">
+      <a href="{{ url_for('files') }}" aria-label="Notes and files" {% if request.endpoint in ['files','download_file','delete_file'] %}aria-current="page"{% endif %}><span class="material-symbols-outlined" aria-hidden="true">description</span><span>Notes &amp; files</span></a>
+      <a href="{{ url_for('profile') }}" aria-label="Profile" {% if request.endpoint in ['profile','profile_avatar'] %}aria-current="page"{% endif %}><span class="material-symbols-outlined" aria-hidden="true">account_circle</span><span>Profile</span></a>
+      <a href="{{ url_for('settings') }}" aria-label="Settings" {% if request.endpoint == 'settings' %}aria-current="page"{% endif %}><span class="material-symbols-outlined" aria-hidden="true">settings</span><span>Settings</span></a>
+    </div>
+  </div>
   <button id="mobileQuickAdd" type="button" aria-label="Add new item"><span class="material-symbols-outlined">add</span></button>
 </nav>
 {% with messages=get_flashed_messages(with_categories=true) %}{% if messages %}<div class="toast-stack">{% for category,message in messages %}<div class="toast {{ category }}"><span class="material-symbols-outlined">{{ 'check_circle' if category=='success' else 'error' }}</span>{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}
 <script>
 document.body.dataset.theme = {{ current_theme|tojson }};
 document.body.dataset.mode = {{ current_theme_mode|tojson }};
+document.documentElement.dataset.mode = {{ current_theme_mode|tojson }};
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.toast-stack .toast').forEach(toast => {
     window.setTimeout(() => {
@@ -45,6 +51,29 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       window.location.assign({{ url_for('assignments', new='1')|tojson }});
     }
+  });
+  const overflow = document.querySelector('.mobile-overflow');
+  const overflowToggle = document.getElementById('mobileOverflowToggle');
+  const closeOverflow = () => {
+    overflow?.classList.remove('open');
+    overflowToggle?.setAttribute('aria-expanded', 'false');
+    overflowToggle?.blur();
+  };
+  overflowToggle?.addEventListener('click', event => {
+    event.stopPropagation();
+    const isOpen = overflowToggle.getAttribute('aria-expanded') !== 'true';
+    overflow?.classList.toggle('open', isOpen);
+    overflowToggle.setAttribute('aria-expanded', String(isOpen));
+    if (!isOpen) overflowToggle.blur();
+  });
+  document.addEventListener('click', event => {
+    if (overflow && !overflow.contains(event.target)) closeOverflow();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeOverflow();
+  });
+  overflow?.querySelectorAll('.mobile-more-menu a').forEach(link => {
+    link.addEventListener('click', closeOverflow);
   });
   document.querySelectorAll('.avatar-photo').forEach(avatar => {
     avatar.textContent = {{ user_initials|tojson }};
