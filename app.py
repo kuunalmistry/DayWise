@@ -116,6 +116,7 @@ class User(db.Model):
     bio = db.Column(db.String(300), nullable=False, default="")
     avatar_filename = db.Column(db.String(255))
     theme = db.Column(db.String(20), nullable=False, default="blue")
+    theme_mode = db.Column(db.String(10), nullable=False, default="light")
 
 
 # ------------------------------------------------------------
@@ -215,6 +216,9 @@ def inject_helpers():
         "subject_options": SUBJECT_OPTIONS,
         "current_user": user,
         "current_theme": user.theme if user and user.theme in THEME_OPTIONS else "blue",
+        "current_theme_mode": (
+            user.theme_mode if user and user.theme_mode in {"light", "dark"} else "light"
+        ),
         "theme_options": THEME_OPTIONS,
         "user_initials": "".join(
             part[0] for part in user.name.split()[:2]
@@ -226,6 +230,13 @@ def inject_helpers():
 def load_current_user():
     user_id = session.get("user_id")
     g.current_user = db.session.get(User, user_id) if user_id else None
+    if (
+        g.current_user
+        and g.current_user.theme_mode == "light"
+        and g.current_user.theme == "black"
+    ):
+        g.current_user.theme = "blue"
+        db.session.commit()
 
     if request.endpoint in {"login", "signup", "static"}:
         return None
@@ -834,13 +845,21 @@ def delete_file(file_id):
 def settings():
     if request.method == "POST":
         theme = request.form.get("theme", "")
-        if theme not in THEME_OPTIONS:
+        theme_mode = request.form.get(
+            "theme_mode", g.current_user.theme_mode or "light"
+        )
+        if (
+            theme not in THEME_OPTIONS
+            or theme_mode not in {"light", "dark"}
+            or (theme == "black" and theme_mode != "dark")
+        ):
             flash("Choose one of the available workspace themes.", "error")
             return redirect(url_for("settings"))
 
         g.current_user.theme = theme
+        g.current_user.theme_mode = theme_mode
         db.session.commit()
-        flash(f"{THEME_OPTIONS[theme]} glass theme applied.", "success")
+        flash(f"{theme_mode.title()} {THEME_OPTIONS[theme]} glass theme applied.", "success")
         return redirect(url_for("settings"))
 
     return render_template("settings.html", theme_options=THEME_OPTIONS)
@@ -863,6 +882,10 @@ def initialize_database():
     if "theme" not in user_columns:
         db.session.execute(text(
             "ALTER TABLE users ADD COLUMN theme VARCHAR(20) NOT NULL DEFAULT 'blue'"
+        ))
+    if "theme_mode" not in user_columns:
+        db.session.execute(text(
+            "ALTER TABLE users ADD COLUMN theme_mode VARCHAR(10) NOT NULL DEFAULT 'light'"
         ))
 
     assignment_columns = {

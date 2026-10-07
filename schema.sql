@@ -9,7 +9,8 @@ CREATE TABLE users (
     password_hash VARCHAR(256) NOT NULL,
     bio VARCHAR(300) NOT NULL DEFAULT '',
     avatar_filename VARCHAR(255),
-    theme VARCHAR(20) NOT NULL DEFAULT 'blue'
+    theme VARCHAR(20) NOT NULL DEFAULT 'blue',
+    theme_mode VARCHAR(10) NOT NULL DEFAULT 'light'
 );
 
 CREATE TABLE assignments (

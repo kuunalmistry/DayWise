@@ -31,14 +31,31 @@
           </a>
           <article class="glass-card settings-card theme-settings-card">
             <div class="card-heading">
-              <div><span class="eyebrow">PERSONALIZE</span><h2>Glass color theme</h2></div>
+              <div><span class="eyebrow">PERSONALIZE</span><h2>Glass appearance</h2></div>
               <span class="material-symbols-outlined">palette</span>
             </div>
-            <p class="theme-description">Choose a soft tint for your glass workspace. Your selection is saved to your account.</p>
+            <p class="theme-description">Choose light or dark glass, then pair it with a color theme. Your choices are saved to your account.</p>
             <form class="theme-form" action="{{ url_for('settings') }}" method="POST">
+              <fieldset class="appearance-mode">
+                <legend>Glass mode</legend>
+                <div class="mode-options" role="radiogroup" aria-label="Glass appearance mode">
+                  <label class="mode-option">
+                    <input type="radio" name="theme_mode" value="light" {% if current_theme_mode == 'light' %}checked{% endif %}>
+                    <span class="material-symbols-outlined" aria-hidden="true">light_mode</span>
+                    <span><strong>Light</strong><small>Bright, airy glass</small></span>
+                  </label>
+                  <label class="mode-option">
+                    <input type="radio" name="theme_mode" value="dark" {% if current_theme_mode == 'dark' %}checked{% endif %}>
+                    <span class="material-symbols-outlined" aria-hidden="true">dark_mode</span>
+                    <span><strong>Dark</strong><small>Deep, shaded glass</small></span>
+                  </label>
+                </div>
+              </fieldset>
+              <fieldset class="appearance-colors">
+                <legend>Color theme</legend>
               <div class="theme-options" role="radiogroup" aria-label="Workspace color theme">
                 {% for theme_id, theme_name in theme_options.items() %}
-                  <label class="theme-option theme-option-{{ theme_id }}">
+                  <label class="theme-option theme-option-{{ theme_id }}" {% if theme_id == 'black' and current_theme_mode != 'dark' %}hidden{% endif %}>
                     <input type="radio" name="theme" value="{{ theme_id }}" {% if current_theme == theme_id %}checked{% endif %}>
                     <span class="theme-swatch" aria-hidden="true"></span>
                     <span class="theme-option-name">{{ theme_name }}</span>
@@ -46,8 +63,9 @@
                   </label>
                 {% endfor %}
               </div>
+              </fieldset>
               <div class="theme-form-actions">
-                <span class="theme-current-label">Current: {{ theme_options[current_theme] }}</span>
+                <span class="theme-current-label">Current: {{ current_theme_mode|title }} · {{ theme_options[current_theme] }}</span>
                 <button class="primary-button" type="submit"><span class="material-symbols-outlined">check</span>Apply theme</button>
               </div>
             </form>
@@ -61,5 +79,29 @@
       </div>
     </main>
   </div>
+  <script>
+    (() => {
+      const form = document.querySelector('.theme-form');
+      const blackOption = form?.querySelector('.theme-option-black');
+      const currentLabel = form?.querySelector('.theme-current-label');
+      if (!form || !blackOption || !currentLabel) return;
+
+      const updateSelection = () => {
+        const mode = form.querySelector('input[name="theme_mode"]:checked')?.value || 'light';
+        const theme = form.querySelector('input[name="theme"]:checked');
+        document.body.dataset.mode = mode;
+        blackOption.hidden = mode !== 'dark';
+        if (mode !== 'dark' && theme?.value === 'black') {
+          const blueOption = form.querySelector('input[name="theme"][value="blue"]');
+          if (blueOption) blueOption.checked = true;
+        }
+        const selectedTheme = form.querySelector('input[name="theme"]:checked')?.closest('.theme-option')?.querySelector('.theme-option-name')?.textContent;
+        currentLabel.textContent = `Selected: ${mode[0].toUpperCase()}${mode.slice(1)} · ${selectedTheme || 'Blue'}`;
+      };
+
+      form.addEventListener('change', updateSelection);
+      updateSelection();
+    })();
+  </script>
 </body>
 </html>

@@ -24,6 +24,7 @@
 {% with messages=get_flashed_messages(with_categories=true) %}{% if messages %}<div class="toast-stack">{% for category,message in messages %}<div class="toast {{ category }}"><span class="material-symbols-outlined">{{ 'check_circle' if category=='success' else 'error' }}</span>{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}
 <script>
 document.body.dataset.theme = {{ current_theme|tojson }};
+document.body.dataset.mode = {{ current_theme_mode|tojson }};
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.toast-stack .toast').forEach(toast => {
     window.setTimeout(() => {
