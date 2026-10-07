@@ -1223,6 +1223,20 @@ body[data-mode="light"] .theme-option-black,
 }
 
 @media(max-width:600px){
+  .dashboard-layout{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  .dashboard-layout>.left-column{
+    grid-column:1/-1;
+    width:100%;
+    min-width:0;
+  }
+  .left-column>.focus-card,
+  .left-column>.upcoming-card{
+    width:100%;
+    max-width:100%;
+    min-width:0;
+  }
   .left-column > .streak-card{
     height:auto;
     min-height:150px;
