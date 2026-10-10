@@ -31,6 +31,7 @@ app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DATABASE_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 app.secret_key = os.getenv("SECRET_KEY", "studysync-local-development-secret")
 
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
@@ -235,6 +236,8 @@ def inject_helpers():
 def load_current_user():
     user_id = session.get("user_id")
     g.current_user = db.session.get(User, user_id) if user_id else None
+    if g.current_user:
+        session.permanent = True
     if (
         g.current_user
         and g.current_user.theme_mode == "light"
@@ -272,6 +275,7 @@ def login():
             return render_template("auth.html", mode="login")
 
         session.clear()
+        session.permanent = True
         session["user_id"] = user.id
         return redirect(url_for("home"))
 
@@ -316,6 +320,7 @@ def signup():
                 )
             db.session.commit()
             session.clear()
+            session.permanent = True
             session["user_id"] = user.id
             flash("Your StudySync account is ready.", "success")
             return redirect(url_for("home"))

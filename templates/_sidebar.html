@@ -13,18 +13,19 @@
   <form class="sidebar-logout" action="{{ url_for('logout') }}" method="POST"><button class="side-link" type="submit" title="Sign out"><span class="material-symbols-outlined">logout</span><span>Sign out</span></button></form>
 </aside>
 <nav class="mobile-nav" aria-label="Quick navigation">
-  <a href="{{ url_for('home') }}" aria-label="Overview" title="Overview" class="{% if request.endpoint == 'home' %}active{% endif %}"><span class="material-symbols-outlined">grid_view</span></a>
-  <a href="{{ url_for('subjects') }}" aria-label="Subjects" title="Subjects" class="{% if request.endpoint in ['subjects','subject_detail'] %}active{% endif %}"><span class="material-symbols-outlined">menu_book</span></a>
-  <a href="{{ url_for('assignments') }}" aria-label="Calendar" title="Calendar" class="{% if request.endpoint in ['assignments','edit_assignment'] %}active{% endif %}"><span class="material-symbols-outlined">calendar_month</span></a>
+  <a href="{{ url_for('home') }}" aria-label="Overview" title="Overview" class="mobile-overview {% if request.endpoint == 'home' %}active{% endif %}"><span class="material-symbols-outlined" aria-hidden="true">inbox</span><span class="mobile-nav-label" aria-hidden="true">Overview</span></a>
+  <a href="{{ url_for('assignments') }}" aria-label="Calendar" title="Calendar" class="mobile-calendar {% if request.endpoint in ['assignments','edit_assignment'] %}active{% endif %}"><span class="material-symbols-outlined" aria-hidden="true">calendar_month</span><span class="mobile-nav-label" aria-hidden="true">Calendar</span></a>
+  <a href="{{ url_for('subjects') }}" aria-label="Subjects" title="Subjects" class="mobile-subjects {% if request.endpoint in ['subjects','subject_detail'] %}active{% endif %}"><span class="material-symbols-outlined" aria-hidden="true">menu_book</span><span class="mobile-nav-label" aria-hidden="true">Subjects</span></a>
   <div class="mobile-overflow">
-    <button class="mobile-overflow-toggle" id="mobileOverflowToggle" type="button" aria-label="More pages" aria-expanded="false" aria-controls="mobileOverflowMenu" title="More pages"><span class="material-symbols-outlined">more_horiz</span></button>
+    <button class="mobile-overflow-toggle {% if request.endpoint in ['files','download_file','delete_file','profile','profile_avatar','settings'] %}active{% endif %}" id="mobileOverflowToggle" type="button" aria-label="More pages" aria-expanded="false" aria-controls="mobileOverflowMenu" title="More pages"><span class="material-symbols-outlined">more_horiz</span></button>
+    <span class="mobile-nav-label" aria-hidden="true">More</span>
     <div class="mobile-more-menu" id="mobileOverflowMenu" aria-label="More pages">
       <a href="{{ url_for('files') }}" aria-label="Notes and files" {% if request.endpoint in ['files','download_file','delete_file'] %}aria-current="page"{% endif %}><span class="material-symbols-outlined" aria-hidden="true">description</span><span>Notes &amp; files</span></a>
       <a href="{{ url_for('profile') }}" aria-label="Profile" {% if request.endpoint in ['profile','profile_avatar'] %}aria-current="page"{% endif %}><span class="material-symbols-outlined" aria-hidden="true">account_circle</span><span>Profile</span></a>
       <a href="{{ url_for('settings') }}" aria-label="Settings" {% if request.endpoint == 'settings' %}aria-current="page"{% endif %}><span class="material-symbols-outlined" aria-hidden="true">settings</span><span>Settings</span></a>
     </div>
   </div>
-  <button id="mobileQuickAdd" type="button" aria-label="Add new item"><span class="material-symbols-outlined">add</span></button>
+  <button id="mobileQuickAdd" type="button" aria-label="Add new item"><span class="material-symbols-outlined">add</span><span class="mobile-nav-label" aria-hidden="true">Add</span></button>
 </nav>
 {% with messages=get_flashed_messages(with_categories=true) %}{% if messages %}<div class="toast-stack">{% for category,message in messages %}<div class="toast {{ category }}"><span class="material-symbols-outlined">{{ 'check_circle' if category=='success' else 'error' }}</span>{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}
 <script>
@@ -32,6 +33,37 @@ document.body.dataset.theme = {{ current_theme|tojson }};
 document.body.dataset.mode = {{ current_theme_mode|tojson }};
 document.documentElement.dataset.mode = {{ current_theme_mode|tojson }};
 document.addEventListener('DOMContentLoaded', () => {
+  const mobileModalViewport = window.matchMedia('(max-width: 600px)');
+  let modalPageScrollY = 0;
+  let mobileModalLocked = false;
+  const syncMobileModalScroll = () => {
+    const modalIsOpen = mobileModalViewport.matches &&
+      document.querySelector('.modal-backdrop.open');
+    if (modalIsOpen && !mobileModalLocked) {
+      modalPageScrollY = window.scrollY;
+      document.querySelectorAll('.modal-backdrop.open').forEach(modal => {
+        modal.scrollLeft = 0;
+        const card = modal.querySelector('.modal-card');
+        if (card) card.scrollLeft = 0;
+      });
+      document.documentElement.classList.add('mobile-modal-open');
+      document.body.style.setProperty('--mobile-modal-scroll-y', `-${modalPageScrollY}px`);
+      document.body.classList.add('mobile-modal-open');
+      mobileModalLocked = true;
+    } else if (!modalIsOpen && mobileModalLocked) {
+      document.documentElement.classList.remove('mobile-modal-open');
+      document.body.classList.remove('mobile-modal-open');
+      document.body.style.removeProperty('--mobile-modal-scroll-y');
+      mobileModalLocked = false;
+      window.scrollTo(0, modalPageScrollY);
+    }
+  };
+  const modalObserver = new MutationObserver(syncMobileModalScroll);
+  document.querySelectorAll('.modal-backdrop').forEach(modal => {
+    modalObserver.observe(modal, {attributes: true, attributeFilter: ['class']});
+  });
+  syncMobileModalScroll();
+  mobileModalViewport.addEventListener('change', syncMobileModalScroll);
   document.querySelectorAll('.toast-stack .toast').forEach(toast => {
     window.setTimeout(() => {
       toast.classList.add('is-dismissing');
