@@ -1,12 +1,16 @@
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    send_file, send_from_directory, flash, jsonify, abort, g, session
+    send_file, flash, jsonify, abort, g, session
 )
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date, timedelta
 from sqlalchemy import or_, func, inspect, text
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
+from io import BytesIO
+import mimetypes
 import os
 import re
 import uuid
@@ -17,26 +21,102 @@ from werkzeug.security import check_password_hash, generate_password_hash
 app = Flask(__name__)
 
 # ------------------------------------------------------------
-# Local-only configuration
+# Configuration
 # ------------------------------------------------------------
 load_dotenv()
 
-# StudySync Local intentionally has no cloud dependencies.
-# The database is a SQLite file and uploaded files live in uploads/.
 BASE_DIR = app.root_path
 DATABASE_PATH = os.path.join(BASE_DIR, "studysync.db")
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 
-app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DATABASE_PATH}"
+
+def normalize_database_url(database_url):
+    """Normalize Render/Supabase PostgreSQL URLs for psycopg 3."""
+    try:
+        url = make_url(database_url)
+    except (TypeError, ValueError):
+        raise RuntimeError("DATABASE_URL must be a valid PostgreSQL connection URL.") from None
+
+    if url.drivername in {"postgres", "postgresql", "postgresql+psycopg2"}:
+        url = url.set(drivername="postgresql+psycopg")
+    elif url.drivername != "postgresql+psycopg":
+        raise RuntimeError("DATABASE_URL must use PostgreSQL.")
+
+    query = dict(url.query)
+    sslmode = query.get("sslmode")
+    if not isinstance(sslmode, str) or sslmode.lower() not in {
+        "require", "verify-ca", "verify-full"
+    }:
+        query["sslmode"] = "require"
+    return url.set(query=query)
+
+
+def validate_production_secret(secret_key):
+    if (
+        len(secret_key) < 32
+        or secret_key == "studysync-local-development-secret"
+        or secret_key.lower().startswith(("replace-", "change-", "your-"))
+    ):
+        raise RuntimeError(
+            "Production requires a random SECRET_KEY of at least 32 characters."
+        )
+    return secret_key
+
+
+def validate_production_storage(supabase_url, service_role_key):
+    if (
+        not supabase_url
+        or not supabase_url.startswith("https://")
+        or "your-project" in supabase_url
+        or not service_role_key
+        or service_role_key.lower().startswith(("replace-", "your-"))
+    ):
+        raise RuntimeError(
+            "Production requires a valid HTTPS SUPABASE_URL and "
+            "SUPABASE_SERVICE_ROLE_KEY."
+        )
+
+
+IS_PRODUCTION = (
+    os.getenv("APP_ENV", "").strip().lower() == "production"
+    or os.getenv("RENDER", "").strip().lower() == "true"
+)
+if IS_PRODUCTION:
+    secret_key = validate_production_secret(os.getenv("SECRET_KEY", ""))
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        raise RuntimeError("Production requires DATABASE_URL.")
+    validate_production_storage(
+        os.getenv("SUPABASE_URL", ""),
+        os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""),
+    )
+    database_uri = normalize_database_url(database_url)
+else:
+    secret_key = os.getenv("SECRET_KEY", "studysync-local-development-secret")
+    database_uri = f"sqlite:///{DATABASE_PATH}"
+
+app.config["SQLALCHEMY_DATABASE_URI"] = database_uri
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
-app.secret_key = os.getenv("SECRET_KEY", "studysync-local-development-secret")
+app.config["SESSION_COOKIE_SECURE"] = IS_PRODUCTION
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["STORAGE_BACKEND"] = "supabase" if IS_PRODUCTION else "local"
+app.config["SUPABASE_URL"] = os.getenv("SUPABASE_URL")
+app.config["SUPABASE_SERVICE_ROLE_KEY"] = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+app.config["SUPABASE_STORAGE_BUCKET"] = os.getenv(
+    "SUPABASE_STORAGE_BUCKET", "daywise-files"
+)
+app.secret_key = secret_key
 
-os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+if app.config["STORAGE_BACKEND"] == "local":
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
 db = SQLAlchemy(app)
+_supabase_client = None
 
 ALLOWED_EXTENSIONS = {
     "pdf", "doc", "docx", "png", "jpg", "jpeg", "ipynb", "zip", "sql", "pptx"
@@ -209,6 +289,111 @@ def owned_file_or_404(file_id):
     return uploaded_file_query().filter_by(id=file_id).first_or_404()
 
 
+class StorageOperationError(Exception):
+    """A file operation failed without exposing storage credentials to clients."""
+
+
+def storage_object_key(user_id, category, extension):
+    return f"users/{user_id}/{category}/{uuid.uuid4().hex}.{extension}"
+
+
+def local_storage_path(stored_filename):
+    if not stored_filename or os.path.basename(stored_filename) != stored_filename:
+        raise StorageOperationError("Invalid local storage path.")
+    upload_root = os.path.realpath(app.config["UPLOAD_FOLDER"])
+    file_path = os.path.realpath(os.path.join(upload_root, stored_filename))
+    if os.path.commonpath([upload_root, file_path]) != upload_root:
+        raise StorageOperationError("Invalid local storage path.")
+    return file_path
+
+
+def supabase_storage_bucket():
+    global _supabase_client
+    if _supabase_client is None:
+        from supabase import create_client
+
+        try:
+            _supabase_client = create_client(
+                app.config["SUPABASE_URL"],
+                app.config["SUPABASE_SERVICE_ROLE_KEY"],
+            )
+        except Exception:
+            app.logger.error("Unable to initialize the private storage client.")
+            raise StorageOperationError(
+                "Unable to connect to private file storage."
+            ) from None
+    return _supabase_client.storage.from_(app.config["SUPABASE_STORAGE_BUCKET"])
+
+
+def upload_stored_object(stored_filename, uploaded_file, content_type):
+    if app.config["STORAGE_BACKEND"] == "supabase":
+        try:
+            supabase_storage_bucket().upload(
+                stored_filename,
+                uploaded_file.stream.read(),
+                file_options={
+                    "content-type": content_type or "application/octet-stream",
+                    "upsert": "false",
+                },
+            )
+        except Exception:
+            app.logger.error("Private storage upload failed.")
+            raise StorageOperationError("Unable to save the uploaded file.") from None
+        return
+
+    try:
+        uploaded_file.save(local_storage_path(stored_filename))
+    except OSError:
+        app.logger.exception("Local file save failed")
+        raise StorageOperationError("Unable to save the uploaded file.") from None
+
+
+def download_stored_object(stored_filename):
+    if app.config["STORAGE_BACKEND"] == "supabase":
+        try:
+            return supabase_storage_bucket().download(stored_filename)
+        except Exception:
+            app.logger.error("Private storage download failed.")
+            raise StorageOperationError("Unable to retrieve the stored file.") from None
+
+    try:
+        with open(local_storage_path(stored_filename), "rb") as stored_file:
+            return stored_file.read()
+    except OSError:
+        raise StorageOperationError("The stored file could not be found.") from None
+
+
+def delete_stored_object(stored_filename):
+    if app.config["STORAGE_BACKEND"] == "supabase":
+        try:
+            supabase_storage_bucket().remove([stored_filename])
+        except Exception:
+            app.logger.error("Private storage deletion failed.")
+            raise StorageOperationError("Unable to delete the stored file.") from None
+        return
+
+    try:
+        local_path = local_storage_path(stored_filename)
+        if os.path.isfile(local_path):
+            os.remove(local_path)
+    except OSError:
+        app.logger.exception("Local file delete failed")
+        raise StorageOperationError("Unable to delete the stored file.") from None
+
+
+def private_file_response(stored_filename, download_name, content_type=None):
+    data = download_stored_object(stored_filename)
+    response = send_file(
+        BytesIO(data),
+        as_attachment=download_name is not None,
+        download_name=download_name,
+        mimetype=content_type or "application/octet-stream",
+        max_age=0,
+    )
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
+
+
 @app.context_processor
 def inject_helpers():
     user = getattr(g, "current_user", None)
@@ -226,6 +411,11 @@ def inject_helpers():
             user.theme_mode if user and user.theme_mode in {"light", "dark"} else "light"
         ),
         "theme_options": THEME_OPTIONS,
+        "storage_backend_label": (
+            "Private cloud storage"
+            if app.config["STORAGE_BACKEND"] == "supabase"
+            else "Local storage"
+        ),
         "user_initials": "".join(
             part[0] for part in user.name.split()[:2]
         ).upper() if user else "",
@@ -246,7 +436,7 @@ def load_current_user():
         g.current_user.theme = "blue"
         db.session.commit()
 
-    if request.endpoint in {"login", "signup", "static"}:
+    if request.endpoint in {"login", "signup", "static", "health_check"}:
         return None
     if g.current_user is None:
         session.clear()
@@ -310,7 +500,7 @@ def signup():
             )
             db.session.add(user)
             db.session.flush()
-            if is_first_user:
+            if is_first_user and app.config["STORAGE_BACKEND"] == "local":
                 # Assign pre-authentication local data to the first account.
                 Assignment.query.filter_by(user_id=None).update(
                     {"user_id": user.id}, synchronize_session=False
@@ -349,7 +539,6 @@ def profile():
             flash("Your bio must be 300 characters or fewer.", "error")
             return redirect(url_for("profile"))
 
-        new_avatar_path = None
         new_avatar_filename = None
         if avatar and avatar.filename:
             original_filename = secure_filename(avatar.filename)
@@ -382,14 +571,18 @@ def profile():
                 flash("That file is not a valid JPG, PNG, or WebP image.", "error")
                 return redirect(url_for("profile"))
 
-            new_avatar_filename = f"profile_{user.id}_{uuid.uuid4().hex}.{extension}"
-            new_avatar_path = os.path.join(
-                app.config["UPLOAD_FOLDER"], new_avatar_filename
+            new_avatar_filename = (
+                storage_object_key(user.id, "avatars", extension)
+                if app.config["STORAGE_BACKEND"] == "supabase"
+                else f"profile_{user.id}_{uuid.uuid4().hex}.{extension}"
             )
             try:
-                avatar.save(new_avatar_path)
-            except OSError:
-                app.logger.exception("Profile image save failed")
+                upload_stored_object(
+                    new_avatar_filename,
+                    avatar,
+                    avatar.mimetype or f"image/{extension}",
+                )
+            except StorageOperationError:
                 flash("Unable to save your profile image.", "error")
                 return redirect(url_for("profile"))
 
@@ -402,19 +595,18 @@ def profile():
             db.session.commit()
         except Exception:
             db.session.rollback()
-            if new_avatar_path and os.path.isfile(new_avatar_path):
-                os.remove(new_avatar_path)
+            if new_avatar_filename:
+                try:
+                    delete_stored_object(new_avatar_filename)
+                except StorageOperationError:
+                    app.logger.error("Unable to roll back the uploaded profile image.")
             raise
 
         if new_avatar_filename and old_avatar_filename:
-            old_avatar_path = os.path.join(
-                app.config["UPLOAD_FOLDER"], old_avatar_filename
-            )
-            if os.path.isfile(old_avatar_path):
-                try:
-                    os.remove(old_avatar_path)
-                except OSError:
-                    app.logger.exception("Unable to remove replaced profile image")
+            try:
+                delete_stored_object(old_avatar_filename)
+            except StorageOperationError:
+                app.logger.error("Unable to remove the replaced profile image.")
         flash("Your profile has been updated.", "success")
         return redirect(url_for("profile"))
 
@@ -426,7 +618,14 @@ def profile_avatar():
     filename = g.current_user.avatar_filename
     if not filename:
         abort(404)
-    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+    try:
+        return private_file_response(
+            filename,
+            None,
+            mimetypes.guess_type(filename)[0] or "application/octet-stream",
+        )
+    except StorageOperationError:
+        abort(404)
 
 
 # ------------------------------------------------------------
@@ -630,7 +829,7 @@ def add_subtask(assignment_id):
 
 @app.route("/toggle-subtask/<int:subtask_id>", methods=["POST"])
 def toggle_subtask(subtask_id):
-    subtask = SubTask.query.get_or_404(subtask_id)
+    subtask = SubTask.query.filter_by(id=subtask_id).first_or_404()
     assignment = owned_assignment_or_404(subtask.assignment_id)
     subtask.completed = (
         True if assignment.status == "Completed" else not subtask.completed
@@ -650,7 +849,7 @@ def toggle_subtask(subtask_id):
 
 @app.route("/delete-subtask/<int:subtask_id>", methods=["POST"])
 def delete_subtask(subtask_id):
-    subtask = SubTask.query.get_or_404(subtask_id)
+    subtask = SubTask.query.filter_by(id=subtask_id).first_or_404()
     owned_assignment_or_404(subtask.assignment_id)
     assignment_id = subtask.assignment_id
     db.session.delete(subtask)
@@ -776,23 +975,27 @@ def upload_file():
         flash("Invalid file name.", "error")
         return redirect(url_for("files"))
 
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
-    stored_filename = f"{timestamp}_{original_filename}"
-    local_path = os.path.join(app.config["UPLOAD_FOLDER"], stored_filename)
-
     # Determine size before saving so the database metadata stays accurate.
     file.stream.seek(0, os.SEEK_END)
     file_size = file.stream.tell()
     file.stream.seek(0)
 
+    extension = original_filename.rsplit(".", 1)[1].lower()
+    stored_filename = (
+        storage_object_key(g.current_user.id, "files", extension)
+        if app.config["STORAGE_BACKEND"] == "supabase"
+        else f"file_{uuid.uuid4().hex}.{extension}"
+    )
     try:
-        file.save(local_path)
-    except OSError:
-        app.logger.exception("Local file save failed")
-        flash("Unable to save the file locally.", "error")
+        upload_stored_object(
+            stored_filename,
+            file,
+            file.mimetype or mimetypes.guess_type(original_filename)[0],
+        )
+    except StorageOperationError:
+        flash("Unable to save the file.", "error")
         return redirect(url_for("files"))
 
-    extension = original_filename.rsplit(".", 1)[1].lower()
     subject = request.form.get("subject", "").strip()
     new_file = UploadedFile(
         filename=original_filename,
@@ -809,9 +1012,9 @@ def upload_file():
     except Exception:
         db.session.rollback()
         try:
-            os.remove(local_path)
-        except OSError:
-            app.logger.exception("Failed to roll back local file after database error")
+            delete_stored_object(stored_filename)
+        except StorageOperationError:
+            app.logger.error("Unable to roll back the uploaded assignment file.")
         raise
 
     flash("File uploaded successfully.", "success")
@@ -824,31 +1027,24 @@ def upload_file():
 @app.route("/download-file/<int:file_id>")
 def download_file(file_id):
     uploaded_file = owned_file_or_404(file_id)
-    local_path = os.path.join(app.config["UPLOAD_FOLDER"], uploaded_file.stored_filename)
-
-    if not os.path.isfile(local_path):
-        flash("The local file could not be found.", "error")
+    try:
+        return private_file_response(
+            uploaded_file.stored_filename,
+            uploaded_file.filename,
+            mimetypes.guess_type(uploaded_file.filename)[0],
+        )
+    except StorageOperationError:
+        flash("The stored file could not be found.", "error")
         return redirect(url_for("files"))
-
-    return send_file(
-        local_path,
-        as_attachment=True,
-        download_name=uploaded_file.filename,
-        mimetype=None,
-    )
 
 
 @app.route("/delete-file/<int:file_id>", methods=["POST"])
 def delete_file(file_id):
     uploaded_file = owned_file_or_404(file_id)
-    local_path = os.path.join(app.config["UPLOAD_FOLDER"], uploaded_file.stored_filename)
-
     try:
-        if os.path.isfile(local_path):
-            os.remove(local_path)
-    except OSError:
-        app.logger.exception("Local file delete failed")
-        flash("Unable to delete the local file.", "error")
+        delete_stored_object(uploaded_file.stored_filename)
+    except StorageOperationError:
+        flash("Unable to delete the file.", "error")
         return redirect(url_for("files"))
 
     db.session.delete(uploaded_file)
@@ -893,6 +1089,17 @@ def file_too_large(_error):
     return redirect(url_for("files"))
 
 
+@app.route("/healthz")
+def health_check():
+    try:
+        db.session.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        db.session.rollback()
+        app.logger.error("Database health check failed.")
+        return jsonify(status="unavailable"), 503
+    return jsonify(status="ok")
+
+
 def initialize_database():
     db.create_all()
     user_columns = {
@@ -912,7 +1119,7 @@ def initialize_database():
     }
     if "completed_at" not in assignment_columns:
         db.session.execute(text(
-            "ALTER TABLE assignments ADD COLUMN completed_at DATETIME NULL"
+            "ALTER TABLE assignments ADD COLUMN completed_at TIMESTAMP NULL"
         ))
     if "user_id" not in assignment_columns:
         db.session.execute(text(
@@ -937,14 +1144,20 @@ def initialize_database():
         "CREATE INDEX IF NOT EXISTS ix_uploaded_files_user_id ON uploaded_files (user_id)"
     ))
     db.session.execute(text(
-        "UPDATE subtasks SET completed = 1 "
-        "WHERE completed = 0 AND assignment_id IN "
+        "UPDATE subtasks SET completed = TRUE "
+        "WHERE completed = FALSE AND assignment_id IN "
         "(SELECT id FROM assignments WHERE status = 'Completed')"
     ))
     db.session.commit()
 
 
+@app.cli.command("init-db")
+def initialize_database_command():
+    """Create any missing tables and apply the existing additive migrations."""
+    initialize_database()
+
+
 if __name__ == "__main__":
     with app.app_context():
         initialize_database()
-    app.run(debug=True)
+    app.run(debug=not IS_PRODUCTION)
