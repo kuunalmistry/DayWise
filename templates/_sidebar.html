@@ -1,3 +1,4 @@
+{% include '_app_startup.html' %}
 <aside class="sidebar">
   <a class="brand" href="{{ url_for('home') }}">
     <span class="brand-mark" aria-hidden="true"><svg class="brand-icon" viewBox="0 0 24 24" focusable="false"><path d="M12 7.25c-2.1-1.65-5.18-2.18-8-1.5v12c2.82-.68 5.9-.15 8 1.5m0-12c2.1-1.65 5.18-2.18 8-1.5v12c-2.82-.68-5.9-.15-8 1.5m0-12v13.5"/><path d="M6.5 9.1c1.4-.1 2.65.15 3.8.65m-3.8 2.2c1.4-.1 2.65.15 3.8.65m3.4-3.5c1.2-.3 2.4-.3 3.5-.1m-3.5 2.8c1.2-.3 2.4-.3 3.5-.1"/></svg></span><span class="brand-name">StudySync</span>
@@ -116,8 +117,6 @@ document.addEventListener('DOMContentLoaded', () => {
     avatar.replaceChildren(image);
     {% endif %}
   });
-  const greeting = document.querySelector('.hero h1');
-  if (greeting) greeting.textContent = 'Good morning, ' + {{ current_user.name.split()[0]|tojson }};
 });
 </script>
 <script src="{{ url_for('static', filename='assignment-queue.js') }}" defer></script>

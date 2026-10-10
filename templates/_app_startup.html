@@ -1,0 +1,40 @@
+<script>
+(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const navigation = performance.getEntriesByType('navigation')[0];
+  const isAppLaunch = location.pathname === '/' && (
+    navigation?.type === 'reload' ||
+    !document.referrer ||
+    new URL(document.referrer).origin !== location.origin
+  );
+  try {
+    if (!isAppLaunch && sessionStorage.getItem('studysyncIntroSessionV3')) return;
+    sessionStorage.setItem('studysyncIntroSessionV3', 'true');
+  } catch (error) {
+    // Play the intro when session storage is unavailable.
+  }
+
+  document.documentElement.classList.add('app-starting');
+  const splash = document.createElement('div');
+  splash.className = 'app-splash';
+  splash.setAttribute('aria-hidden', 'true');
+  const brand = document.createElement('div');
+  brand.className = 'app-splash-brand';
+  const mark = document.createElement('span');
+  mark.className = 'app-splash-mark';
+  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  icon.setAttribute('viewBox', '0 0 24 24');
+  icon.setAttribute('aria-hidden', 'true');
+  icon.innerHTML = '<path d="M12 7.5c-2-1.5-5-2-8-1.25v11.5c3-.75 6-.25 8 1.25m0-11.5c2-1.5 5-2 8-1.25v11.5c-3-.75-6-.25-8 1.25m0-11.5v13"/>';
+  mark.append(icon);
+  const name = document.createElement('span');
+  name.textContent = 'StudySync';
+  brand.append(mark, name);
+  splash.append(brand);
+  document.documentElement.append(splash);
+  window.setTimeout(() => {
+    document.documentElement.classList.remove('app-starting');
+    splash.remove();
+  }, 2500);
+})();
+</script>
