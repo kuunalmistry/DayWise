@@ -1,4 +1,4 @@
--- StudySync Local database reference schema.
+-- DayWIse Local database reference schema.
 -- The Flask application creates/updates the SQLite database automatically
 -- through SQLAlchemy, so you normally do not need to run this file manually.
 

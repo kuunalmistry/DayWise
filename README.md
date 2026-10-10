@@ -1,6 +1,6 @@
 <div align="center">
 
-# StudySync
+# DayWIse
 
 ### Local Development Edition
 
@@ -14,7 +14,7 @@ A Flask-based student productivity application for managing assignments, subtask
 
 ## About
 
-This version of StudySync is intentionally **cloud-independent**. It is designed for local development and future product upgrades without requiring Azure, AWS, Cloudflare, MySQL, or any cloud credentials.
+This version of DayWIse is intentionally **cloud-independent**. It is designed for local development and future product upgrades without requiring Azure, AWS, Cloudflare, MySQL, or any cloud credentials.
 
 The original cloud deployment architecture can remain documented separately for the project presentation. This local edition is the development baseline for improving the application itself.
 
@@ -22,7 +22,7 @@ The original cloud deployment architecture can remain documented separately for 
 
 ```text
 +---------------------------+
-|       StudySync UI        |
+|       DayWIse UI        |
 |     Flask + Jinja/CSS     |
 +-------------+-------------+
               |
@@ -112,7 +112,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 pip install -r requirements.txt
 ```
 
-### 5. Start StudySync
+### 5. Start DayWIse
 
 ```powershell
 python app.py
@@ -159,7 +159,7 @@ The actual uploaded files are stored here. The database stores their metadata an
 
 ## Development Direction
 
-This local version is the foundation for the next StudySync development phase. The application can now be upgraded independently of the cloud deployment architecture, including:
+This local version is the foundation for the next DayWIse development phase. The application can now be upgraded independently of the cloud deployment architecture, including:
 
 - premium UI/UX
 - richer dashboard analytics

@@ -322,7 +322,7 @@ def signup():
             session.clear()
             session.permanent = True
             session["user_id"] = user.id
-            flash("Your StudySync account is ready.", "success")
+            flash("Your DayWIse account is ready.", "success")
             return redirect(url_for("home"))
 
     return render_template("auth.html", mode="signup")
