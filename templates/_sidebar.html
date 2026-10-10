@@ -116,6 +116,14 @@ document.addEventListener('DOMContentLoaded', () => {
     image.alt = {{ current_user.name|tojson }} + ' profile photo';
     avatar.replaceChildren(image);
     {% endif %}
+    if (avatar.tagName !== 'A') {
+      const profileLink = document.createElement('a');
+      profileLink.href = {{ url_for('profile')|tojson }};
+      profileLink.className = avatar.className;
+      profileLink.setAttribute('aria-label', 'Your profile');
+      while (avatar.firstChild) profileLink.append(avatar.firstChild);
+      avatar.replaceWith(profileLink);
+    }
   });
 });
 </script>

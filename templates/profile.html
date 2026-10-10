@@ -57,17 +57,198 @@
       </div>
     </main>
   </div>
+  <dialog class="photo-crop-dialog" id="photoCropDialog" aria-labelledby="photoCropTitle">
+    <section class="photo-crop-panel">
+      <div class="photo-crop-heading">
+        <div><span class="eyebrow">PROFILE PHOTO</span><h2 id="photoCropTitle">Adjust your photo</h2></div>
+        <button class="photo-crop-close" id="cancelPhotoCrop" type="button" aria-label="Cancel photo crop">×</button>
+      </div>
+      <p class="photo-crop-help">Drag to position your photo, then use the slider to zoom.</p>
+      <canvas class="photo-crop-canvas" id="photoCropCanvas" aria-label="Square profile photo crop area; use arrow keys to reposition the photo" tabindex="0"></canvas>
+      <label class="photo-crop-zoom" for="photoCropZoom"><span>Zoom</span><input id="photoCropZoom" type="range" min="1" max="3" step="0.01" value="1"><span class="material-symbols-outlined" aria-hidden="true">zoom_in</span></label>
+      <p class="photo-crop-error" id="photoCropError" role="alert" hidden></p>
+      <div class="photo-crop-actions">
+        <button class="ghost-button" id="discardPhotoCrop" type="button">Cancel</button>
+        <button class="primary-button" id="applyPhotoCrop" type="button"><span class="material-symbols-outlined">check</span>Use photo</button>
+      </div>
+    </section>
+  </dialog>
   <script>
     const avatarInput = document.getElementById('avatarInput');
+    const preview = document.getElementById('profilePreview');
+    const cropDialog = document.getElementById('photoCropDialog');
+    const cropCanvas = document.getElementById('photoCropCanvas');
+    const cropContext = cropCanvas.getContext('2d');
+    const zoomControl = document.getElementById('photoCropZoom');
+    const cropError = document.getElementById('photoCropError');
+    let cropSize = 300;
+    const outputSize = 512;
+    let selectedImage = null;
+    let selectedFile = null;
+    let panX = 0;
+    let panY = 0;
+    let pointerPosition = null;
+    let previewUrl = null;
+    let selectedImageUrl = null;
+
+    function drawCrop() {
+      const pixelRatio = window.devicePixelRatio || 1;
+      cropCanvas.width = cropSize * pixelRatio;
+      cropCanvas.height = cropSize * pixelRatio;
+      cropCanvas.style.width = `${cropSize}px`;
+      cropCanvas.style.height = `${cropSize}px`;
+      cropContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      cropContext.clearRect(0, 0, cropSize, cropSize);
+      if (!selectedImage) return;
+
+      const baseScale = cropSize / Math.min(selectedImage.naturalWidth, selectedImage.naturalHeight);
+      const scale = baseScale * Number(zoomControl.value);
+      const width = selectedImage.naturalWidth * scale;
+      const height = selectedImage.naturalHeight * scale;
+      panX = Math.min((width - cropSize) / 2, Math.max(-(width - cropSize) / 2, panX));
+      panY = Math.min((height - cropSize) / 2, Math.max(-(height - cropSize) / 2, panY));
+      const left = (cropSize - width) / 2 + panX;
+      const top = (cropSize - height) / 2 + panY;
+      cropContext.save();
+      cropContext.beginPath();
+      cropContext.arc(cropSize / 2, cropSize / 2, cropSize / 2, 0, Math.PI * 2);
+      cropContext.clip();
+      cropContext.drawImage(selectedImage, left, top, width, height);
+      cropContext.restore();
+    }
+
+    function resetCropPosition() {
+      panX = 0;
+      panY = 0;
+      zoomControl.value = '1';
+      drawCrop();
+    }
+
+    function closeCropDialog(discardSelection) {
+      cropDialog.close();
+      if (selectedImageUrl) URL.revokeObjectURL(selectedImageUrl);
+      selectedImageUrl = null;
+      selectedImage = null;
+      selectedFile = null;
+      pointerPosition = null;
+      if (discardSelection) avatarInput.value = '';
+      cropError.hidden = true;
+    }
+
     avatarInput.addEventListener('change', () => {
       const file = avatarInput.files[0];
       if (!file) return;
-      const preview = document.getElementById('profilePreview');
-      const image = document.createElement('img');
-      image.alt = 'Selected profile photo preview';
-      image.src = URL.createObjectURL(file);
-      image.onload = () => URL.revokeObjectURL(image.src);
-      preview.replaceChildren(image);
+      if (file.size > 5 * 1024 * 1024) {
+        avatarInput.value = '';
+        cropError.textContent = 'Your profile image must be 5 MB or smaller.';
+        cropError.hidden = false;
+        cropDialog.showModal();
+        return;
+      }
+
+      selectedFile = file;
+      selectedImage = new Image();
+      selectedImage.onload = () => {
+        cropSize = Math.min(300, window.innerWidth - 80);
+        resetCropPosition();
+        cropError.hidden = true;
+        cropDialog.showModal();
+      };
+      selectedImage.onerror = () => {
+        avatarInput.value = '';
+        cropError.textContent = 'That image could not be opened. Choose a valid JPG, PNG, or WebP image.';
+        cropError.hidden = false;
+        cropDialog.showModal();
+      };
+      selectedImageUrl = URL.createObjectURL(file);
+      selectedImage.src = selectedImageUrl;
+    });
+
+    zoomControl.addEventListener('input', drawCrop);
+    cropCanvas.addEventListener('pointerdown', event => {
+      pointerPosition = { x: event.clientX, y: event.clientY };
+      cropCanvas.setPointerCapture(event.pointerId);
+    });
+    cropCanvas.addEventListener('pointermove', event => {
+      if (!pointerPosition) return;
+      panX += event.clientX - pointerPosition.x;
+      panY += event.clientY - pointerPosition.y;
+      pointerPosition = { x: event.clientX, y: event.clientY };
+      drawCrop();
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(eventName => {
+      cropCanvas.addEventListener(eventName, () => { pointerPosition = null; });
+    });
+    cropCanvas.addEventListener('keydown', event => {
+      const step = event.shiftKey ? 10 : 2;
+      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+      event.preventDefault();
+      if (event.key === 'ArrowUp') panY += step;
+      if (event.key === 'ArrowDown') panY -= step;
+      if (event.key === 'ArrowLeft') panX += step;
+      if (event.key === 'ArrowRight') panX -= step;
+      drawCrop();
+    });
+
+    document.getElementById('applyPhotoCrop').addEventListener('click', () => {
+      if (!selectedImage || !selectedFile) return;
+      const baseScale = cropSize / Math.min(selectedImage.naturalWidth, selectedImage.naturalHeight);
+      const displayScale = baseScale * Number(zoomControl.value);
+      const width = selectedImage.naturalWidth * displayScale;
+      const height = selectedImage.naturalHeight * displayScale;
+      const left = (cropSize - width) / 2 + panX;
+      const top = (cropSize - height) / 2 + panY;
+      const sourceX = -left / displayScale;
+      const sourceY = -top / displayScale;
+      const sourceSize = cropSize / displayScale;
+      const outputCanvas = document.createElement('canvas');
+      outputCanvas.width = outputSize;
+      outputCanvas.height = outputSize;
+      outputCanvas.getContext('2d').drawImage(
+        selectedImage,
+        sourceX, sourceY, sourceSize, sourceSize,
+        0, 0, outputSize, outputSize
+      );
+
+      const outputType = selectedFile.type;
+      outputCanvas.toBlob(blob => {
+        if (!blob) {
+          cropError.textContent = 'Unable to crop this image. Please choose another photo.';
+          cropError.hidden = false;
+          return;
+        }
+        const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[blob.type];
+        if (!extension) {
+          cropError.textContent = 'This browser cannot crop the selected image format.';
+          cropError.hidden = false;
+          return;
+        }
+        const croppedFile = new File([blob], `profile-photo.${extension}`, { type: blob.type });
+        const transfer = new DataTransfer();
+        transfer.items.add(croppedFile);
+        avatarInput.files = transfer.files;
+
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = URL.createObjectURL(blob);
+        const image = document.createElement('img');
+        image.alt = 'Selected profile photo preview';
+        image.src = previewUrl;
+        preview.replaceChildren(image);
+        closeCropDialog(false);
+      }, outputType, outputType === 'image/jpeg' ? 0.92 : undefined);
+    });
+
+    document.getElementById('cancelPhotoCrop').addEventListener('click', () => closeCropDialog(true));
+    document.getElementById('discardPhotoCrop').addEventListener('click', () => closeCropDialog(true));
+    cropDialog.addEventListener('cancel', () => {
+      avatarInput.value = '';
+      if (selectedImageUrl) URL.revokeObjectURL(selectedImageUrl);
+      selectedImageUrl = null;
+      selectedImage = null;
+      selectedFile = null;
+    });
+    cropDialog.addEventListener('click', event => {
+      if (event.target === cropDialog) closeCropDialog(true);
     });
   </script>
 </body>

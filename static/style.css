@@ -693,6 +693,20 @@ html.app-starting .app-splash-mark{animation:app-mark-pop .8s cubic-bezier(.2,.8
 .profile-intro-copy{min-width:0}.profile-intro-copy h2{font-size:19px;margin:8px 0 5px;font-weight:600;overflow-wrap:anywhere}.profile-intro-copy p{font-size:11px;margin-bottom:14px}
 .photo-picker{display:inline-flex!important;align-items:center;gap:7px;cursor:pointer;font-size:11px!important;padding:9px 13px!important}
 .photo-picker .material-symbols-outlined{font-size:17px}
+.profile-page .page-title form .ghost-button,
+.profile-page .photo-picker{
+  background:var(--blue);
+  color:#fff;
+  border:1px solid var(--blue);
+  box-shadow:0 5px 14px color-mix(in srgb,var(--blue) 24%,transparent);
+}
+.profile-page .page-title form .ghost-button:hover,
+.profile-page .page-title form .ghost-button:focus-visible,
+.profile-page .photo-picker:hover,
+.profile-page .photo-picker:focus-within{
+  background:color-mix(in srgb,var(--blue) 86%,#101522);
+  color:#fff;
+}
 .visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .profile-editor{padding:28px}
 .profile-editor .card-heading{align-items:flex-start}
@@ -707,6 +721,21 @@ html.app-starting .app-splash-mark{animation:app-mark-pop .8s cubic-bezier(.2,.8
 .profile-note{grid-column:1/-1;padding:20px 24px;display:flex;align-items:flex-start;gap:15px}
 .profile-note-icon{color:#3f72ff;background:#dbe8ff;border-radius:14px;padding:10px}
 .profile-note strong{font-size:13px}.profile-note p{color:#7185a1;font-size:12px;line-height:1.7;margin:5px 0 0}
+.photo-crop-dialog{width:min(440px,calc(100vw - 24px));max-width:none;padding:0;border:0;border-radius:26px;background:transparent;color:var(--ink);overflow:visible}
+.photo-crop-dialog::backdrop{background:rgba(17,29,51,.58);backdrop-filter:blur(5px)}
+.photo-crop-panel{padding:26px;border:1px solid rgba(255,255,255,.78);border-radius:26px;background:color-mix(in srgb,var(--glass) 86%,white 14%);box-shadow:0 24px 70px rgba(25,43,77,.24);backdrop-filter:blur(24px)}
+.photo-crop-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.photo-crop-heading h2{margin:5px 0 0;font-size:21px}
+.photo-crop-close{width:36px;height:36px;flex:none;border:0;border-radius:50%;background:rgba(112,133,160,.12);color:var(--ink);font-size:25px;line-height:1;cursor:pointer}
+.photo-crop-help{margin:12px 0 18px;color:var(--muted);font-size:13px;line-height:1.5}
+.photo-crop-canvas{display:block;max-width:100%;margin:0 auto;border-radius:50%;background:rgba(31,47,69,.12);cursor:grab;touch-action:none}
+.photo-crop-canvas:active{cursor:grabbing}
+.photo-crop-zoom{display:flex;align-items:center;gap:12px;margin:20px 0 8px;color:var(--muted);font-size:13px}
+.photo-crop-zoom input{min-width:0;flex:1;accent-color:var(--blue)}
+.photo-crop-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+.photo-crop-actions>*{min-height:44px}
+.photo-crop-error{margin:12px 0 0;padding:10px 12px;border-radius:12px;background:rgba(255,227,223,.85);color:#a83e3a;font-size:12px}
+.photo-crop-error[hidden]{display:none}
 @media(max-width:900px){.profile-layout{grid-template-columns:1fr}.profile-note{grid-column:auto}.profile-intro{min-height:160px}}
 @media(max-width:560px){.auth-body{padding:20px 14px}.auth-card{padding:30px 23px}.auth-heading h1{font-size:27px}.profile-intro{padding:21px;gap:15px}.profile-preview{width:82px;height:82px}.profile-editor{padding:22px}.profile-actions{flex-wrap:wrap}.profile-actions>*{flex:1}}
 @media(min-width:901px){.mobile-nav{display:none}}
@@ -1876,5 +1905,33 @@ body[data-mode="light"] .theme-option-black,
     font-size:clamp(18px,5.2vw,22px);
     line-height:1.25;
     margin:4px 0 8px;
+  }
+}
+
+@media(min-width:1201px) and (max-width:1400px){
+  .dashboard-layout{
+    grid-template-columns:minmax(240px,.8fr) minmax(360px,1.2fr) minmax(270px,.95fr);
+  }
+}
+
+@media(max-width:900px){
+  .topbar .topbar-brand{min-height:44px}
+  .topbar .avatar-photo{width:44px;height:44px;flex-basis:44px}
+  .card-heading>a,
+  .completed-list a{min-height:44px}
+  .card-heading>a{display:inline-flex;align-items:center;min-width:44px}
+  .completed-list a{display:flex;align-items:center}
+  .filter-chip{min-width:44px}
+  .wide-queue>.card-heading>.filter-row>.filter-chip{min-height:44px}
+}
+
+@media(max-width:600px){
+  .mobile-nav .mobile-overflow-toggle{
+    height:44px;
+    min-height:44px;
+    flex-basis:44px;
+  }
+  .topbar .top-actions>.primary-button[onclick*="assignmentModal"]{
+    display:none;
   }
 }
