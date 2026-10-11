@@ -101,6 +101,7 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
+app.config["SESSION_REFRESH_EACH_REQUEST"] = True
 app.config["SESSION_COOKIE_SECURE"] = IS_PRODUCTION
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -512,7 +513,7 @@ def signup():
             session.clear()
             session.permanent = True
             session["user_id"] = user.id
-            flash("Your DayWIse account is ready.", "success")
+            flash("Your DayWise account is ready.", "success")
             return redirect(url_for("home"))
 
     return render_template("auth.html", mode="signup")

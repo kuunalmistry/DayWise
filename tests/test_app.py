@@ -143,6 +143,35 @@ class DayWiseAppTests(unittest.TestCase):
             self.assertNotEqual(user.password_hash, "correct-password")
         self.assertEqual(self.client.get("/").status_code, 200)
 
+    def test_signup_login_and_persistent_same_device_session(self):
+        email = "New.User@Example.com"
+        password = "new-account-password"
+        response = self.client.post(
+            "/signup",
+            data={"name": "New User", "email": email, "password": password},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/")
+        self.assertIn("Expires=", response.headers["Set-Cookie"])
+        with self.client.session_transaction() as user_session:
+            self.assertTrue(user_session.permanent)
+            signed_up_user_id = user_session["user_id"]
+        self.assertEqual(self.client.get("/").status_code, 200)
+
+        self.client.post("/logout")
+        self.assertEqual(self.client.get("/").status_code, 302)
+        response = self.client.post(
+            "/login",
+            data={"email": email.upper(), "password": password},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        with self.client.session_transaction() as user_session:
+            self.assertTrue(user_session.permanent)
+            self.assertEqual(user_session["user_id"], signed_up_user_id)
+        self.assertEqual(self.client.get("/").status_code, 200)
+
     def test_local_upload_download_delete_and_cross_user_file_denial(self):
         self.sign_in_as(self.user_id)
         response = self.client.post(

@@ -25,10 +25,11 @@
   const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   icon.setAttribute('viewBox', '0 0 24 24');
   icon.setAttribute('aria-hidden', 'true');
-  icon.innerHTML = '<path d="M12 7.5c-2-1.5-5-2-8-1.25v11.5c3-.75 6-.25 8 1.25m0-11.5c2-1.5 5-2 8-1.25v11.5c-3-.75-6-.25-8 1.25m0-11.5v13"/>';
+  icon.setAttribute('fill', 'none');
+  icon.innerHTML = '<path d="M3.5 13.5L8.5 18.5L20.5 6.5" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.45" transform="translate(0.5,-2.5)"/><path d="M3.5 13.5L8.5 18.5L20.5 6.5" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>';
   mark.append(icon);
   const name = document.createElement('span');
-  name.textContent = 'DayWIse';
+  name.textContent = 'DayWise';
   brand.append(mark, name);
   splash.append(brand);
   document.documentElement.append(splash);

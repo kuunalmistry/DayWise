@@ -1,6 +1,6 @@
 <div align="center">
 
-# DayWIse
+# DayWise
 
 ### Local Development & Cloud Deployment
 
@@ -14,13 +14,13 @@ A Flask-based student productivity application for managing assignments, subtask
 
 ## About
 
-DayWIse runs locally with SQLite and the `uploads/` directory. In production it can use PostgreSQL through `DATABASE_URL` and the private Supabase Storage bucket `daywise-files`. Database access and the Supabase service-role key remain server-side.
+DayWise runs locally with SQLite and the `uploads/` directory. In production it can use PostgreSQL through `DATABASE_URL` and the private Supabase Storage bucket `daywise-files`. Database access and the Supabase service-role key remain server-side.
 
 ## Architecture
 
 ```text
 +---------------------------+
-|       DayWIse UI        |
+|       DayWise UI        |
 |     Flask + Jinja/CSS     |
 +-------------+-------------+
               |
@@ -80,7 +80,7 @@ Local development needs no cloud credentials. Production requires a Render web s
 ### 1. Open the project
 
 ```powershell
-cd StudySync
+cd DayWise
 ```
 
 ### 2. Create a virtual environment
@@ -116,7 +116,7 @@ Run the regression suite from the repository root with:
 python -m unittest discover -s tests -v
 ```
 
-### 5. Start DayWIse
+### 5. Start DayWise
 
 ```powershell
 python app.py
@@ -183,6 +183,8 @@ The app normalizes Render's legacy `postgres://` URLs to the psycopg 3 SQLAlchem
 driver and requires SSL for PostgreSQL connections. Production startup fails
 clearly when its required settings are missing or the secret key is too short.
 Secure, HTTP-only, SameSite=Lax session cookies are enabled in production.
+Successful sign-up logs the new account in, and login sessions refresh while
+active and remain on the same device for up to 30 days.
 
 ### Render service settings
 
@@ -230,7 +232,7 @@ so the bucket remains private and no signed bearer URL is exposed to the browser
 
 ## Development Direction
 
-DayWIse can continue to be developed in either local or production mode, including:
+DayWise can continue to be developed in either local or production mode, including:
 
 - premium UI/UX
 - richer dashboard analytics

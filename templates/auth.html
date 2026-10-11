@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"><meta name="theme-color" content="{{ '#101522' if current_theme_mode == 'dark' else '#edf5ff' }}">
-  <title>{{ 'Create account' if mode == 'signup' else 'Sign in' }} · DayWIse</title>
+  <title>{{ 'Create account' if mode == 'signup' else 'Sign in' }} · DayWise</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
@@ -13,7 +13,7 @@
 <body class="auth-body">
   <main class="auth-layout">
     <a class="brand auth-brand" href="{{ url_for('login') }}">
-      <span class="brand-mark" aria-hidden="true"><svg class="brand-icon" viewBox="0 0 24 24" focusable="false"><path d="M12 7.25c-2.1-1.65-5.18-2.18-8-1.5v12c2.82-.68 5.9-.15 8 1.5m0-12c2.1-1.65 5.18-2.18 8-1.5v12c-2.82-.68-5.9-.15-8 1.5m0-12v13.5"/><path d="M6.5 9.1c1.4-.1 2.65.15 3.8.65m-3.8 2.2c1.4-.1 2.65.15 3.8.65m3.4-3.5c1.2-.3 2.4-.3 3.5-.1m-3.5 2.8c1.2-.3 2.4-.3 3.5-.1"/></svg></span><span class="brand-name">DayWIse</span>
+      <span class="brand-mark" aria-hidden="true"><svg class="brand-icon" viewBox="0 0 24 24" focusable="false"><path d="M12 7.25c-2.1-1.65-5.18-2.18-8-1.5v12c2.82-.68 5.9-.15 8 1.5m0-12c2.1-1.65 5.18-2.18 8-1.5v12c-2.82-.68-5.9-.15-8 1.5m0-12v13.5"/><path d="M6.5 9.1c1.4-.1 2.65.15 3.8.65m-3.8 2.2c1.4-.1 2.65.15 3.8.65m3.4-3.5c1.2-.3 2.4-.3 3.5-.1m-3.5 2.8c1.2-.3 2.4-.3 3.5-.1"/></svg></span><span class="brand-name">DayWise</span>
     </a>
     <section class="auth-card glass-card">
       <div class="auth-heading">
@@ -39,7 +39,7 @@
         <button class="primary-button auth-submit" type="submit">{{ 'Create your account' if mode == 'signup' else 'Sign in' }}<svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
       </form>
       <p class="auth-switch">
-        {{ 'Already have an account?' if mode == 'signup' else 'New to DayWIse?' }}
+        {{ 'Already have an account?' if mode == 'signup' else 'New to DayWise?' }}
         <a href="{{ url_for('login' if mode == 'signup' else 'signup') }}">{{ 'Sign in' if mode == 'signup' else 'Create an account' }}</a>
       </p>
       <div class="auth-footnote"><svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Your study workspace stays yours.</div>
